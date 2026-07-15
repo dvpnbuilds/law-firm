@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(npm test *)",
+      "Bash(npx supabase *)",
+      "Read(**)",
+      "Edit(**)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Read(.env)",
+      "Read(.env.local)",
+      "Read(**/*.pem)"
+    ]
+  }
+}
