@@ -3,7 +3,14 @@ import { insertMessage } from "@/lib/db/messages";
 import { listCaseTypes } from "@/lib/db/case-types";
 import { classifyCaseType } from "./classify";
 import { faqAnswer } from "./chat";
-import { intakeDetailsSchema, type IntakeMessageResponse, type IntakeDetails } from "@/lib/schemas/intake";
+import { generateChecklistForIntake } from "./checklist";
+import { summarizeIntake } from "./summarize";
+import {
+  intakeDetailsSchema,
+  type ChecklistItemOut,
+  type IntakeMessageResponse,
+  type IntakeDetails,
+} from "@/lib/schemas/intake";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -31,7 +38,13 @@ function caseTypeLabel(slug: string): string {
 async function handleStep(
   intake: Intake,
   message: string
-): Promise<{ reply: string; status: Intake["status"]; complete: boolean }> {
+): Promise<{
+  reply: string;
+  status: Intake["status"];
+  complete: boolean;
+  summary?: string;
+  checklist?: ChecklistItemOut[];
+}> {
   const details = intakeDetailsSchema.parse(intake.details);
 
   if (details.step === "description") {
@@ -66,15 +79,36 @@ async function handleStep(
   if (details.step === "phone") {
     const isHandoff = intake.case_type_id === null;
     const finalStatus: Intake["status"] = isHandoff ? "handoff" : "completed";
+    const clientPhone = message.trim();
+
+    let caseTypeSlug: string | null = null;
+    if (intake.case_type_id) {
+      const caseTypes = await listCaseTypes();
+      caseTypeSlug = caseTypes.find((c) => c.id === intake.case_type_id)?.slug ?? null;
+    }
+
+    const matterLabel = isHandoff
+      ? "matter outside core practice areas, flagged for attorney follow-up"
+      : `${caseTypeLabel(caseTypeSlug ?? "other")} matter`;
+    const summary = await summarizeIntake(intake.client_name, matterLabel, details.description ?? "");
+
     await updateIntake(intake.id, {
-      client_phone: message.trim(),
+      client_phone: clientPhone,
       status: finalStatus,
       details: { ...details, step: "done" },
+      summary,
     });
+
+    let checklist: ChecklistItemOut[] | undefined;
+    if (!isHandoff && intake.case_type_id) {
+      const generated = await generateChecklistForIntake(intake.id, intake.case_type_id);
+      checklist = generated.items.map((i) => ({ id: i.id, label: i.label, received: i.received }));
+    }
+
     const closing = isHandoff
       ? `Thanks — that's everything we need. Since your matter falls outside our core practice areas, one of our attorneys will personally follow up with you soon.`
       : `Thanks — that's everything we need for now. Our team will review your matter and follow up shortly. You can also book a free consultation using the scheduling link below.`;
-    return { reply: closing, status: finalStatus, complete: true };
+    return { reply: closing, status: finalStatus, complete: true, summary, checklist };
   }
 
   return {
@@ -107,5 +141,13 @@ export async function handleIntakeMessage(intakeId: string | null, message: stri
 
   const result = await handleStep(current, message);
   await insertMessage(current.id, "assistant", result.reply);
-  return { intakeId: current.id, reply: result.reply, status: result.status as IntakeMessageResponse["status"], mode: "intake", complete: result.complete };
+  return {
+    intakeId: current.id,
+    reply: result.reply,
+    status: result.status as IntakeMessageResponse["status"],
+    mode: "intake",
+    complete: result.complete,
+    summary: result.summary,
+    checklist: result.checklist,
+  };
 }

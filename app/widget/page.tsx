@@ -3,14 +3,19 @@
 import { useState } from "react";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
+type ChecklistItem = { id: string; label: string; received: boolean };
 
 const GREETING = "Hi, I'm the Alden & Cross intake assistant. To get started, could you briefly describe what's going on?";
+const CALENDLY_URL = process.env.NEXT_PUBLIC_CALENDLY_URL || "https://calendly.com/lexintake-demo/consultation";
 
 export default function WidgetPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([{ role: "assistant", content: GREETING }]);
   const [input, setInput] = useState("");
   const [intakeId, setIntakeId] = useState<string | null>(null);
   const [complete, setComplete] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,6 +40,9 @@ export default function WidgetPage() {
       setIntakeId(data.intakeId);
       setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
       setComplete(data.complete);
+      setStatus(data.status);
+      if (data.summary) setSummary(data.summary);
+      if (data.checklist) setChecklist(data.checklist);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -65,9 +73,31 @@ export default function WidgetPage() {
       </div>
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       {complete ? (
-        <p className="mt-4 rounded-lg border border-dashed p-4 text-center text-sm text-gray-500">
-          Intake complete. Thanks for reaching out to Alden & Cross Legal.
-        </p>
+        <div className="mt-4 space-y-4 rounded-lg border border-dashed p-4 text-sm">
+          <p className="text-center text-gray-500">Intake complete. Thanks for reaching out to Alden & Cross Legal.</p>
+          {summary && (
+            <div>
+              <h2 className="mb-1 font-semibold">Summary</h2>
+              <p className="text-gray-700">{summary}</p>
+            </div>
+          )}
+          {checklist.length > 0 && (
+            <div>
+              <h2 className="mb-1 font-semibold">Documents to gather</h2>
+              <ul className="list-inside list-disc text-gray-700">
+                {checklist.map((item) => (
+                  <li key={item.id}>{item.label}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {status === "completed" && (
+            <div>
+              <h2 className="mb-1 font-semibold">Book a free consultation</h2>
+              <iframe src={CALENDLY_URL} className="h-[600px] w-full rounded border" title="Book a consultation" />
+            </div>
+          )}
+        </div>
       ) : (
         <form onSubmit={handleSubmit} className="mt-4 flex gap-2">
           <input

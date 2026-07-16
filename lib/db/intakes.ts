@@ -25,6 +25,16 @@ export async function createIntake(): Promise<Intake> {
   return data;
 }
 
+export async function listIntakes(): Promise<Intake[]> {
+  const supabase = getServiceClient();
+  const { data, error } = await supabase
+    .from("lexintake_intakes")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
 export async function getIntake(id: string): Promise<Intake | null> {
   const supabase = getServiceClient();
   const { data, error } = await supabase.from("lexintake_intakes").select("*").eq("id", id).maybeSingle();

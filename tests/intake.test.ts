@@ -53,6 +53,15 @@ describe.skipIf(!canCallLlm)("full simulated intake (live LLM + DB)", () => {
     res = await handleIntakeMessage(intakeId, "555-123-4567");
     expect(res.complete).toBe(true);
     expect(res.status).toBe(expectStatus);
+    expect(res.summary).toContain("Jane Doe");
+
+    if (expectStatus === "completed") {
+      expect(res.checklist).toBeDefined();
+      expect(res.checklist!.length).toBeGreaterThan(0);
+      expect(res.checklist!.every((i) => i.received === false)).toBe(true);
+    } else {
+      expect(res.checklist).toBeUndefined();
+    }
 
     const intake = await getIntake(intakeId);
     expect(intake).not.toBeNull();
@@ -60,6 +69,7 @@ describe.skipIf(!canCallLlm)("full simulated intake (live LLM + DB)", () => {
     expect(intake!.client_email).toBe("jane@example.com");
     expect(intake!.client_phone).toBe("555-123-4567");
     expect(intake!.status).toBe(expectStatus);
+    expect(intake!.summary).toContain("Jane Doe");
   }, 60000);
 });
 

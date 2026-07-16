@@ -18,12 +18,21 @@ export const intakeMessageRequestSchema = z.object({
 });
 export type IntakeMessageRequest = z.infer<typeof intakeMessageRequestSchema>;
 
+export const checklistItemOutSchema = z.object({
+  id: z.string().uuid(),
+  label: z.string(),
+  received: z.boolean(),
+});
+export type ChecklistItemOut = z.infer<typeof checklistItemOutSchema>;
+
 export const intakeMessageResponseSchema = z.object({
   intakeId: z.string().uuid(),
   reply: z.string().min(1),
   status: intakeStatusSchema,
   mode: z.enum(["intake", "faq"]),
   complete: z.boolean(),
+  summary: z.string().optional(),
+  checklist: z.array(checklistItemOutSchema).optional(),
 });
 export type IntakeMessageResponse = z.infer<typeof intakeMessageResponseSchema>;
 
